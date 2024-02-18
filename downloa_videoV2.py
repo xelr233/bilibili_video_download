@@ -244,7 +244,9 @@ def main():
             json_data = f.read()
             json_data = json.loads(json_data)
             json_data.extend(all_video_info)
+            f.seek(0)
             f.write(json.dumps(json_data,indent=4,ensure_ascii=False))
+            f.truncate()
     else:
         # 否则创建video_info.json文件，并将所有视频信息写入该文件中
         with open('./video_info.json','w',encoding='utf-8') as f:
