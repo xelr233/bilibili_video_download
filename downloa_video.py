@@ -6,14 +6,6 @@ import os
 import time
 import subprocess
 
-"""
-    video_url.txt    #视频链接文件 一行一个
-    cookie.txt       #cookie文件 在浏览器登录后 用开发者模式里网络选项，刷新下，选择稳定，点击www.bilibili.com，复制标头里Cookie
-    video_info.json   #视频信息文件
-    max_thread_num 是最大同时下载视频的线程数量，默认是5
-"""
-max_thread_num = 5
-
 cookie = open('cookie.txt', 'r').read()
 if not cookie:
     exit('请先获取cookie')
@@ -78,7 +70,7 @@ def get_video_info(url):
         return None
 
 # 定义下载视频的函数
-def download_video(video_url,session,headers,Referer,counter):
+def download_video(video_url,session,headers,Referer):
     # 添加Referer头
     headers['Referer'] = Referer
     # 尝试3次下载
@@ -88,7 +80,7 @@ def download_video(video_url,session,headers,Referer,counter):
         # 如果请求成功
         if response.ok == True:
             # 以二进制写模式打开文件
-            with open(f'video{counter}.mp4','wb') as f:
+            with open('video.mp4','wb') as f:
                 # 遍历响应的content
                 for chunk in response.iter_content(chunk_size=1024):
                     # 如果chunk不为空
@@ -105,7 +97,7 @@ def download_video(video_url,session,headers,Referer,counter):
             print(f'视频第{i}茨下载失败')
 
 # 定义下载音频的函数
-def download_audio(audio_url,session,headers,Referer,counter):
+def download_audio(audio_url,session,headers,Referer):
     # 添加Referer头
     headers['Referer'] = Referer
     # 尝试3次下载
@@ -115,7 +107,7 @@ def download_audio(audio_url,session,headers,Referer,counter):
         # 如果请求成功
         if response.ok == True:
             # 以二进制写模式打开文件
-            with open(f'audio{counter}.mp3','wb') as f:
+            with open('audio.mp3','wb') as f:
                 # 遍历响应的content
                 for chunk in response.iter_content(chunk_size=1024):
                     # 如果chunk不为空
@@ -131,7 +123,7 @@ def download_audio(audio_url,session,headers,Referer,counter):
             # 打印下载失败次数
             print(f'视频第{i}茨下载失败')
 
-def download_data(video_info,counter):
+def download_data(video_info):
     # 如果video_info不为空
     if video_info != None :
         # 获取视频信息
@@ -141,9 +133,9 @@ def download_data(video_info,counter):
         audio_url = video_info[3]
         page_url = video_info[4]
         # 创建两个线程，分别用于下载视频和音频
-        t1 = threading.Thread(target=download_video,args=(video_url,session,headers,page_url,counter))
+        t1 = threading.Thread(target=download_video,args=(video_url,session,headers,page_url))
         t1.start()
-        t2 = threading.Thread(target=download_audio,args=(audio_url,session,headers,page_url,counter))
+        t2 = threading.Thread(target=download_audio,args=(audio_url,session,headers,page_url))
         t2.start()
         # 等待两个线程下载完成
         t1.join()
@@ -151,13 +143,13 @@ def download_data(video_info,counter):
         # 关闭会话
         session.close()
         # 如果视频和音频都下载成功，返回标题
-        if os.path.exists(f'video{counter}.mp4') and os.path.exists(f'audio{counter}.mp3'):
+        if os.path.exists('video.mp4') and os.path.exists('audio.mp3'):
             return title
         else:
             # 如果下载失败，删除视频和音频文件
             try:
-                os.remove(f'video{counter}.mp4')
-                os.remove(f'audio{counter}.mp3')
+                os.remove('video.mp4')
+                os.remove('audio.mp3')
             except:
                 pass
             # 返回None
@@ -166,11 +158,11 @@ def download_data(video_info,counter):
         # 如果video_info为空，返回None
         return None
 
-def ffmpeg_merge(number,counter):
+def ffmpeg_merge(number):
     # 如果传入的number不为空
     if number != None:
         # 使用os.system()函数执行ffmpeg命令，合并视频和音频
-        subprocess.run(f'ffmpeg -i video{counter}.mp4 -i audio{counter}.mp3 -c:v copy -c:a copy output{counter}.mp4')
+        subprocess.run('ffmpeg -i video.mp4 -i audio.mp3 -c:v copy -c:a copy output.mp4')
         #os.system('ffmpeg -i video.mp4 -i audio.mp3 -c:v copy -c:a copy output.mp4')
         # 如果video文件夹不存在，则创建video文件夹
         if not os.path.exists('video'):
@@ -181,10 +173,10 @@ def ffmpeg_merge(number,counter):
         path = os.path.join(path, 'video')
         # 将合并后的视频文件重命名
         new_file_name = number +'.mp4'
-        os.renames(f'output{counter}.mp4',os.path.join(path, new_file_name))
+        os.renames('output.mp4',os.path.join(path, new_file_name))
         # 删除视频和音频文件
-        os.remove(f'video{counter}.mp4')
-        os.remove(f'audio{counter}.mp3')
+        os.remove('video.mp4')
+        os.remove('audio.mp3')
         # 打印提示信息
         print('视频合并完成')
         # 返回True
@@ -193,10 +185,8 @@ def ffmpeg_merge(number,counter):
         # 返回False
         return False
 
-def preprocess():
+def main():
     # 打开文件，读取视频url
-    if not os.path.exists('video_url.txt'):
-        return None
     with open('video_url.txt', 'r', encoding='utf-8') as f:
         url_list = f.read()
     # 将url按行分割
@@ -208,29 +198,34 @@ def preprocess():
     # 如果有效url数量为0，则提示没有有效的url，并返回
     if vailed_url_num == 0:
         print('没有有效的url')
-        return None
+        return
     # 打印总url数量和有效url数量
     print('总url数量',len(url_list),'\n有效的url数量,',vailed_url_num)
-    return vailed_url_list
-# 定于单个线程的下载方法
-def singleThread_download(url,all_video_info,counter,lock):
-    for i in range(3):
-        print(f'第{i+1}次下载第{counter}个视频')
+    # 计数器
+    counter = 0
+    # 存储所有视频信息
+    all_video_info = []
+    # 遍历有效url列表
+    for url in vailed_url_list:
+        #获取视频信息
         number = get_video_number(url)
+        counter +=1
         # 获取视频信息
         video_info = get_video_info(url)
         # 如果获取视频信息失败，则暂停10秒
         if video_info == None:
-            print(f'第{counter}个视频获取视频信息失败')
+            print(f'第{counter}个视频获取视频信息失败,暂停10秒')
+            # 赞同10秒
+            time.sleep(10)
             continue
         #开始下载数据
-        title = download_data(video_info,counter)
+        title = download_data(video_info)
         # 如果下载数据失败，则暂停10秒
         if title == None:
             time.sleep(10)
             continue
         # 下载完成 开始合并数据
-        if ffmpeg_merge(number,counter) != False:
+        if ffmpeg_merge(number) != False:
             print(f'{counter}个视频{title} 下载和合并完成,暂停30秒')
             # 创建视频信息字典
             video_info_dict = {
@@ -239,47 +234,13 @@ def singleThread_download(url,all_video_info,counter,lock):
                 'number':number
             }
             # 将视频信息添加到所有视频信息列表中
-            with lock:
-                all_video_info.append(video_info_dict)
-            break
+            all_video_info.append(video_info_dict)
+            #暂停30秒
+            if counter != vailed_url_num:
+                time.sleep(30)
         else:
             print(f'{counter}个视频{title} 下载或合并失败')
-            continue
-
-def main(max_thread_num=5):
-    url_list = preprocess()
-    if url_list == None:
-        return
-    threat_list = []
-    lock = threading.Lock()
-    all_video_info = []
-    if len(url_list) <= max_thread_num:
-        thread_num = len(url_list)
-    #使用singleThread_download方法 创建每一个线程
-        for counter in range(thread_num):
-            thread = threading.Thread(target=singleThread_download,args=(url_list[i],all_video_info,counter,lock))
-            thread.start()
-            threat_list.append(thread)
-            #等待所有线程结束
-        for thread in threat_list:
-            thread.join()
-    else:
-        url_list = iter(url_list)
-        try:
-            counter = 0
-            while True:
-                for i in range(max_thread_num):
-                    thread = threading.Thread(target=singleThread_download,args=(next(url_list),all_video_info,counter,lock))
-                    counter += 1
-                    thread.start()
-                    threat_list.append(thread)
-                for t in threat_list:
-                    t.join()
-        except StopIteration:
-            pass
-        except Exception as e:
-            print(e)
-    #将所有视频信息写入文件
+    # 如果存在video_info.json文件，则将所有视频信息添加到该文件中
     if os.path.exists('./video_info.json'):
         with open('./video_info.json','r+',encoding='utf-8') as f:
             json_data = f.read()
@@ -292,6 +253,5 @@ def main(max_thread_num=5):
         # 否则创建video_info.json文件，并将所有视频信息写入该文件中
         with open('./video_info.json','w',encoding='utf-8') as f:
             f.write(json.dumps(all_video_info,indent=4,ensure_ascii=False))
-
 if __name__ == '__main__':
-    main(max_thread_num=max_thread_num)
+    main()
